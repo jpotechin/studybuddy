@@ -32,41 +32,41 @@ ollama serve
 ollama pull llama3.1
 ```
 
-### 2. Clone and Setup Backend
+### 2. Clone and Setup Project
 
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd studybuddy/backend
+cd studybuddy
+```
+
+### 3. Setup Backend
+
+```bash
+# Navigate to backend directory
+cd backend
 
 # Install dependencies
 uv sync
 
 # Initialize database
 uv run python -c "from db import init_db; init_db(); print('Database initialized!')"
+
+# Start the FastAPI server
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3. Setup Frontend
+### 4. Setup Frontend (in a new terminal)
 
 ```bash
 # Navigate to frontend directory
-cd ../frontend
+cd frontend
 
 # Install dependencies
 pnpm install
 
 # Start development server
 pnpm run dev
-```
-
-### 4. Start Backend Server
-
-```bash
-# In a new terminal, navigate to backend
-cd studybuddy/backend
-
-# Start the FastAPI server
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 5. Access the Application
@@ -105,20 +105,26 @@ studybuddy/
 #### From PDF Files
 
 ```bash
+# Navigate to backend directory
 cd backend
+
+# Import PDF file
 uv run python import_pdf.py --file ./pdf/subject/test/file.pdf --subject "Subject Name" --test "Test Name"
 ```
 
 #### From Text Files
 
 ```bash
+# Navigate to backend directory
 cd backend
+
+# Import text file
 uv run python import_txt.py --file ./txt/subject/test/file.txt --subject "Subject Name" --test "Test Name"
 ```
 
 #### Via Web Interface
 
-1. Start both frontend and backend servers
+1. Start both frontend and backend servers (see setup instructions above)
 2. Navigate to http://localhost:5173
 3. Select a subject and test
 4. Upload PDF or text files through the interface
@@ -133,18 +139,6 @@ uv run python import_txt.py --file ./txt/subject/test/file.txt --subject "Subjec
 6. **Navigate**: Use Previous/Next buttons or click to flip cards
 
 ## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file in the backend directory (optional):
-
-```env
-# Database (leave empty for SQLite)
-DATABASE_URL=
-
-# Ollama API (defaults to localhost:11434)
-OLLAMA_API_URL=http://localhost:11434
-```
 
 ### AI Model Configuration
 
@@ -184,7 +178,7 @@ Available models: `llama3.1`, `mistral`, `codellama`, etc.
 1. **Setup Database**: Use Vercel Postgres or similar
 2. **Deploy Backend**: Deploy FastAPI to Vercel
 3. **Deploy Frontend**: Deploy React app to Vercel
-4. **Configure Environment**: Set `DATABASE_URL` and `OLLAMA_API_URL`
+4. **Configure Ollama**: Set up Ollama service for AI functionality
 
 ### Docker Deployment
 
@@ -212,8 +206,12 @@ pnpm run dev
 ### Database Management
 
 ```bash
+# Navigate to backend directory
+cd backend
+
 # Reset database (development only)
-uv run python -c "import os; os.remove('study.db') if os.path.exists('study.db') else None; from db import init_db; init_db(); print('Database reset!')"
+rm -f study.db
+uv run python -c "from db import init_db; init_db(); print('Database reset!')"
 ```
 
 ## 🤝 Contributing
@@ -236,26 +234,36 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 **Backend won't start:**
 
 - Ensure Ollama is running: `ollama serve`
-- Check if port 8000 is available
-- Verify Python dependencies: `uv sync`
+- Check if port 8000 is available: `lsof -i :8000`
+- Verify Python dependencies: `cd backend && uv sync`
+- Check if you're in the correct directory: `cd backend`
 
 **Frontend won't connect:**
 
 - Ensure backend is running on port 8000
-- Check CORS settings in `main.py`
-- Verify API endpoints are accessible
+- Check if backend is accessible: `curl http://localhost:8000/subjects`
+- Verify both servers are running simultaneously
 
 **AI model not working:**
 
-- Ensure Ollama is installed and running
+- Ensure Ollama is installed and running: `ollama serve`
 - Pull the required model: `ollama pull llama3.1`
-- Check model name in configuration
+- Check model name in the code (default: llama3.1)
+- Test Ollama directly: `ollama run llama3.1`
 
 **Database errors:**
 
-- Delete `study.db` and restart to reset
+- Delete `study.db` and restart to reset: `cd backend && rm study.db`
 - Check database permissions
 - Verify SQLite installation
+- Reinitialize database: `uv run python -c "from db import init_db; init_db()"`
+
+**Import errors:**
+
+- Ensure you're in the backend directory: `cd backend`
+- Check file paths are correct
+- Verify PDF/text files exist
+- Check Ollama is running before importing
 
 ### Getting Help
 
