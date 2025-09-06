@@ -1,9 +1,0 @@
-example
-
-uv run python import_pdf.py --file sample.pdf --subject Physics --test Midterm1
-
-uv run python import_pdf.py --file ./pdf/CSC280/test1/CSC280-1-Wu-Ch1.pdf --subject CSC280 --test Test1
-uv run python import_pdf.py --file ./pdf/CSC280/test1/CSC280-1-Wu-Ch2.pdf --subject CSC280 --test Test1
-
-
-uv run python import_txt.py --file ./txt/CSC280/test1/homework1.txt --subject CSC280 --test Test1
