@@ -353,3 +353,7 @@ temp/
 ehthumbs.db
 Thumbs.db
 gencard.txt
+
+# Separate Next.js frontend repository
+frontend-nextjs/
+studybuddy-app/
