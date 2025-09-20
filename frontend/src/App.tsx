@@ -5,7 +5,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Navigation } from './components/Navigation';
 import { LoginForm } from './components/LoginForm';
 import { CreateCards } from './pages/CreateCards';
-import { UploadPDF } from './pages/UploadPDF';
 import { StudyPage } from './pages/StudyPage';
 import './App.css';
 
@@ -51,11 +50,6 @@ const AppContent: React.FC = () => {
         <Route path="/create" element={
           <ProtectedRoute>
             <CreateCards />
-          </ProtectedRoute>
-        } />
-        <Route path="/upload" element={
-          <ProtectedRoute>
-            <UploadPDF />
           </ProtectedRoute>
         } />
       </Routes>

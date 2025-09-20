@@ -1,6 +1,5 @@
-from fastapi import Body, FastAPI, UploadFile, Form, HTTPException, Path, Depends
+from fastapi import Body, FastAPI, HTTPException, Path, Depends
 from fastapi.middleware.cors import CORSMiddleware
-import pdfplumber, ollama
 from database import init_db, execute_query, insert_subject, insert_test, get_existing_flashcard_fronts, insert_flashcards
 from auth import authenticate_user, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
 from datetime import timedelta
@@ -86,77 +85,7 @@ async def upload_flashcards_batch(batch: FlashcardsBatch, current_user: dict = D
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def parse_flashcards(text: str, model: str = "llama3.1"):
-    import json, re
 
-    prompt = f"""
-Turn the following study material into flashcards. Generate as many as possible (at least 5 per chunk).
-Respond ONLY in JSON as a list of objects with keys 'front' and 'back'.
-
-Text:
-{text}
-"""
-
-    response = ollama.chat(
-        model=model,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    raw = response["message"]["content"]
-
-    all_cards = []
-
-    try:
-        # Try parsing the whole thing as JSON first
-        all_cards.extend([(c["front"], c["back"]) for c in json.loads(raw)])
-    except Exception:
-        # Fallback: extract all JSON-looking arrays from the text
-        matches = re.findall(r"\[.*?\]", raw, re.DOTALL)
-        for m in matches:
-            try:
-                data = json.loads(m)
-                all_cards.extend([(c["front"], c["back"]) for c in data])
-            except Exception:
-                continue  # skip invalid blocks
-
-    return all_cards
-
-@app.post("/upload_pdf")
-async def upload_pdf(file: UploadFile, subject: str = Form(...), test: str = Form(...), current_user: dict = Depends(get_current_user)):
-    try:
-        # Extract text
-        text = ""
-        with pdfplumber.open(file.file) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-
-        if not text.strip():
-            raise HTTPException(status_code=400, detail="No text found in PDF")
-
-        # Generate flashcards
-        cards = parse_flashcards(text)
-        if not cards:
-            raise HTTPException(status_code=500, detail="Failed to generate flashcards")
-
-        # Store in database
-        subject_id = insert_subject(subject, current_user["id"])
-        test_id = insert_test(test, subject_id)
-
-        # Get existing flashcards for this test to check for duplicates
-        existing_fronts = get_existing_flashcard_fronts(test_id)
-
-        # Only insert new flashcards (check by front text)
-        new_cards = [(front, back) for front, back in cards if front not in existing_fronts]
-        
-        if new_cards:
-            insert_flashcards(test_id, new_cards)
-
-        skipped = len(cards) - len(new_cards)
-        return {"message": f"Added {len(new_cards)} new flashcards (skipped {skipped} duplicates)"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
     
     from fastapi import Path
 

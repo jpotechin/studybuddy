@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -14,6 +15,7 @@ interface Flashcard {
 
 export const CreateCards: React.FC = () => {
   const { token } = useAuth();
+  const [searchParams] = useSearchParams();
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentCard, setCurrentCard] = useState<Flashcard>({
     front: '',
@@ -22,10 +24,25 @@ export const CreateCards: React.FC = () => {
     test: ''
   });
 
+  // Pre-fill subject and test from URL parameters
+  useEffect(() => {
+    const subject = searchParams.get('subject');
+    const test = searchParams.get('test');
+    
+    if (subject || test) {
+      setCurrentCard(prev => ({
+        ...prev,
+        subject: subject || prev.subject,
+        test: test || prev.test
+      }));
+    }
+  }, [searchParams]);
+
   const addCard = () => {
     if (currentCard.front.trim() && currentCard.back.trim() && currentCard.subject.trim() && currentCard.test.trim()) {
       setCards([...cards, { ...currentCard }]);
-      setCurrentCard({ front: '', back: '', subject: '', test: '' });
+      // Keep subject and test, only clear front and back
+      setCurrentCard(prev => ({ ...prev, front: '', back: '' }));
     }
   };
 
