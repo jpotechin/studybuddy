@@ -1,0 +1,12 @@
+fastapi>=0.116.1
+ollama>=0.5.3
+pdfplumber>=0.11.7
+python-multipart>=0.0.20
+reportlab>=4.4.3
+sqlite-utils>=3.38
+tqdm>=4.67.1
+uvicorn[standard]>=0.35.0
+psycopg2-binary>=2.9.9
+python-dotenv>=1.0.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4

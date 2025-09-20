@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:8000"; // no trailing slash
+// Get API base URL from environment variable or fallback to localhost
+const API_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export async function fetchSubjects() {
   const res = await fetch(`${API_URL}/subjects`);

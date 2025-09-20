@@ -1,15 +1,11 @@
 import argparse
-import sqlite3
 import pdfplumber
 import ollama
 import json
 import re
+import sys
 from tqdm import tqdm
-
-DB_PATH = "study.db"
-
-def get_db():
-    return sqlite3.connect(DB_PATH)
+from database import execute_query, insert_subject, insert_test, get_existing_flashcard_fronts, insert_flashcards
 
 # -------------------------
 # PDF Text Extraction
@@ -31,6 +27,22 @@ def chunk_text(words: list[str], chunk_size: int):
         yield " ".join(words[i:i+chunk_size])
 
 # -------------------------
+# Check if Ollama is available
+# -------------------------
+def check_ollama_available():
+    try:
+        ollama.list()
+        return True
+    except Exception as e:
+        print(f"❌ ERROR: Ollama is not available!")
+        print(f"   Error: {e}")
+        print(f"   Please make sure Ollama is running:")
+        print(f"   1. Start Ollama: ollama serve")
+        print(f"   2. Pull a model: ollama pull llama3.1")
+        print(f"   3. Try running this script again")
+        return False
+
+# -------------------------
 # Generate flashcards per chunk
 # -------------------------
 def parse_flashcards(text_chunk: str, model: str = "llama3.1"):
@@ -42,10 +54,16 @@ Text:
 {text_chunk}
 """
 
-    response = ollama.chat(
-        model=model,
-        messages=[{"role": "user", "content": prompt}]
-    )
+    try:
+        response = ollama.chat(
+            model=model,
+            messages=[{"role": "user", "content": prompt}]
+        )
+    except Exception as e:
+        print(f"❌ ERROR: Failed to generate flashcards with Ollama!")
+        print(f"   Error: {e}")
+        print(f"   Make sure Ollama is running and the model '{model}' is available")
+        return []
 
     raw = response["message"]["content"]
 
@@ -69,42 +87,30 @@ Text:
 # -------------------------
 # Insert flashcards into DB
 # -------------------------
-def insert_flashcards(subject: str, test: str, flashcards: list[tuple[str,str]]):
+def insert_flashcards_to_db(subject: str, test: str, flashcards: list[tuple[str,str]]):
     if not flashcards:
         print("No flashcards to insert.")
         return
 
-    conn = get_db()
-    cur = conn.cursor()
+    # Use admin user ID (1) since this is a local import script
+    user_id = 1
 
     # Insert subject
-    cur.execute("INSERT OR IGNORE INTO subjects(name) VALUES(?)", (subject,))
-    cur.execute("SELECT id FROM subjects WHERE name=?", (subject,))
-    subject_id = cur.fetchone()[0]
+    subject_id = insert_subject(subject, user_id)
 
     # Insert test
-    cur.execute(
-        "INSERT OR IGNORE INTO tests(name, subject_id) VALUES(?, ?)", (test, subject_id)
-    )
-    cur.execute("SELECT id FROM tests WHERE name=? AND subject_id=?", (test, subject_id))
-    test_id = cur.fetchone()[0]
+    test_id = insert_test(test, subject_id)
 
     # Get existing flashcards for this test (check by front text only)
-    cur.execute("SELECT front FROM flashcards WHERE test_id=?", (test_id,))
-    existing_fronts = set(row[0] for row in cur.fetchall())
+    existing_fronts = get_existing_flashcard_fronts(test_id)
 
     # Filter out duplicates (check by front text only)
     new_cards = [(f, b) for f, b in flashcards if f not in existing_fronts]
 
     # Insert new flashcards
-    for front, back in new_cards:
-        cur.execute(
-            "INSERT INTO flashcards(front, back, test_id) VALUES(?, ?, ?)",
-            (front, back, test_id),
-        )
+    if new_cards:
+        insert_flashcards(test_id, new_cards)
 
-    conn.commit()
-    conn.close()
     print(f"Added {len(new_cards)} new flashcards to {subject} - {test} (skipped {len(flashcards)-len(new_cards)} duplicates)")
 
 # -------------------------
@@ -119,11 +125,16 @@ def main():
     parser.add_argument("--chunk_size", type=int, default=1000, help="Words per chunk")
     args = parser.parse_args()
 
+    # Check if Ollama is available before doing anything else
+    print("🔍 Checking if Ollama is available...")
+    if not check_ollama_available():
+        sys.exit(1)
+
     print(f"Reading PDF: {args.file}")
     text = extract_text_from_pdf(args.file)
     if not text.strip():
-        print("No text found in PDF!")
-        return
+        print("❌ ERROR: No text found in PDF!")
+        sys.exit(1)
 
     words = text.split()
     total_words = len(words)
@@ -138,7 +149,7 @@ def main():
         flashcards = parse_flashcards(chunk, model=args.model)
         all_flashcards.extend(flashcards)
 
-    insert_flashcards(args.subject, args.test, all_flashcards)
+    insert_flashcards_to_db(args.subject, args.test, all_flashcards)
     print("Done!")
 
 if __name__ == "__main__":
