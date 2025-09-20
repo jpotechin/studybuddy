@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from database import execute_query, insert_subject, insert_test, get_existing_flashcard_fronts, insert_flashcards
 from auth import get_password_hash
+from chunking import chunk_text_intelligently, chunk_text_simple, print_chunking_info
 
 # -------------------------
 # Text File Reading
@@ -14,12 +15,7 @@ def extract_text_from_txt(file_path: str) -> str:
     with open(file_path, 'r', encoding='utf-8') as file:
         return file.read()
 
-# -------------------------
-# Chunking
-# -------------------------
-def chunk_text(words: list[str], chunk_size: int):
-    for i in range(0, len(words), chunk_size):
-        yield " ".join(words[i:i+chunk_size])
+# Chunking functions are now imported from chunking.py
 
 # -------------------------
 # Check if Ollama is available
@@ -117,7 +113,9 @@ def main():
     parser.add_argument("--subject", required=True, help="Subject name")
     parser.add_argument("--test", required=True, help="Test name")
     parser.add_argument("--model", default="llama3.1", help="Ollama model (llama3.1 or mistral)")
-    parser.add_argument("--chunk_size", type=int, default=1000, help="Words per chunk")
+    parser.add_argument("--chunk_size", type=int, default=1000, help="Target words per chunk")
+    parser.add_argument("--overlap_size", type=int, default=100, help="Words to overlap between chunks")
+    parser.add_argument("--use_simple_chunking", action="store_true", help="Use simple fixed-length chunking (not recommended)")
     args = parser.parse_args()
 
     # Check if Ollama is available before doing anything else
@@ -136,16 +134,24 @@ def main():
         print("No text found in TXT file!")
         return
 
-    words = text.split()
-    total_words = len(words)
-    num_chunks = (total_words + args.chunk_size - 1) // args.chunk_size
+    total_words = len(text.split())
+    
+    # Choose chunking strategy
+    if args.use_simple_chunking:
+        print(f"⚠️  Using simple chunking (not recommended)")
+        words = text.split()
+        chunks = list(chunk_text_simple(words, args.chunk_size))
+    else:
+        print(f"✅ Using intelligent chunking with overlap")
+        chunks = list(chunk_text_intelligently(text, args.chunk_size, args.overlap_size))
 
-    print(f"TXT has {total_words} words → will be processed in {num_chunks} chunks (chunk size = {args.chunk_size})")
+    # Print chunking information
+    print_chunking_info(total_words, args.chunk_size, args.overlap_size, args.use_simple_chunking, chunks)
 
     all_flashcards = []
 
     # Process chunks
-    for i, chunk in enumerate(chunk_text(words, chunk_size=args.chunk_size)):
+    for i, chunk in enumerate(chunks):
         print(f"Processing chunk {i+1}/{num_chunks}...")
         flashcards = parse_flashcards(chunk, model=args.model)
         all_flashcards.extend(flashcards)
