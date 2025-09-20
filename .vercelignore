@@ -1,0 +1,53 @@
+# Local development files
+backend/.env
+frontend/.env
+.env
+
+# Import scripts (local only)
+backend/import_*.py
+backend/pdf/
+backend/txt/
+
+# Database files
+*.db
+*.sqlite
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+backend/.venv/
+backend/venv/
+
+# Node modules (will be installed by Vercel)
+frontend/node_modules/
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+README.md
+DEPLOYMENT.md
+TESTING.md
+VERCEL_ENV_SETUP.md
