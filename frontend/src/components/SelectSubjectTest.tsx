@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSubjects, useTests } from "../api/hooks";
-import { Button } from "@/components/ui/button";
+import { Button } from "./ui/button";
 
 interface Subject {
   id: number;

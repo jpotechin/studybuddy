@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useUpdateMastery } from "../api/hooks";
-import { Button } from "@/components/ui/button";
+import { Button } from "./ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "./ui/card";
 
 interface Flashcard {
   id: number;
