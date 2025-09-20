@@ -77,7 +77,7 @@ export function FlashcardPlayer({ cards, startIndex = 0 }: FlashcardPlayerProps)
       <Card className="p-6">
         <CardContent className="text-center space-y-6">
           <CardTitle className="text-2xl">Flashcard {current + 1} of {cards.length}</CardTitle>
-          <div className="flex items-center justify-center gap-6">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
               card.mastered 
                 ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
@@ -184,17 +184,17 @@ export function FlashcardPlayer({ cards, startIndex = 0 }: FlashcardPlayerProps)
             </Button>
           </div>
           
-          <div className="flex justify-between items-center gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <Button
               variant="outline"
               onClick={goToPrevious}
               disabled={current === 0}
-              className="flex items-center gap-2 px-4 py-2"
+              className="flex items-center gap-2 px-4 py-2 w-full sm:w-auto"
             >
               ◀ Previous
             </Button>
             
-            <CardDescription className="text-lg font-medium px-4">
+            <CardDescription className="text-lg font-medium px-4 whitespace-nowrap">
               {current + 1} / {cards.length}
             </CardDescription>
             
@@ -202,7 +202,7 @@ export function FlashcardPlayer({ cards, startIndex = 0 }: FlashcardPlayerProps)
               variant="outline"
               onClick={goToNext}
               disabled={current === cards.length - 1}
-              className="flex items-center gap-2 px-4 py-2"
+              className="flex items-center gap-2 px-4 py-2 w-full sm:w-auto"
             >
               Next ▶
             </Button>

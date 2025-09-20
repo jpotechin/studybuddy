@@ -1,7 +1,27 @@
-from fastapi import Body, FastAPI, UploadFile, Form, HTTPException, Path
+from fastapi import Body, FastAPI, HTTPException, Path, Depends
 from fastapi.middleware.cors import CORSMiddleware
-import sqlite3, pdfplumber, ollama
-from db import init_db
+from database import init_db, execute_query, insert_subject, insert_test, get_existing_flashcard_fronts, insert_flashcards
+from auth import authenticate_user, create_access_token, get_current_user, ACCESS_TOKEN_EXPIRE_MINUTES
+from datetime import timedelta
+from pydantic import BaseModel
+
+# Pydantic models for authentication
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class FlashcardCreate(BaseModel):
+    front: str
+    back: str
+    subject: str
+    test: str
+
+class FlashcardsBatch(BaseModel):
+    flashcards: list[FlashcardCreate]
 
 app = FastAPI()
 
@@ -14,128 +34,105 @@ app.add_middleware(
 
 init_db()
 
-def get_db():
-    return sqlite3.connect("study.db")
-
-def parse_flashcards(text: str, model: str = "llama3.1"):
-    import json, re
-
-    prompt = f"""
-Turn the following study material into flashcards. Generate as many as possible (at least 5 per chunk).
-Respond ONLY in JSON as a list of objects with keys 'front' and 'back'.
-
-Text:
-{text}
-"""
-
-    response = ollama.chat(
-        model=model,
-        messages=[{"role": "user", "content": prompt}]
+# Authentication endpoints
+@app.post("/login", response_model=Token)
+async def login(user: UserLogin):
+    """Login a user"""
+    user_data = authenticate_user(user.username, user.password)
+    if not user_data:
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": str(user_data["id"])}, expires_delta=access_token_expires
     )
+    return {"access_token": access_token, "token_type": "bearer"}
 
-    raw = response["message"]["content"]
+@app.get("/me")
+async def read_users_me(current_user: dict = Depends(get_current_user)):
+    """Get current user information"""
+    return current_user
 
-    all_cards = []
-
+@app.post("/upload_flashcards")
+async def upload_flashcards_batch(batch: FlashcardsBatch, current_user: dict = Depends(get_current_user)):
+    """Upload multiple flashcards created locally"""
     try:
-        # Try parsing the whole thing as JSON first
-        all_cards.extend([(c["front"], c["back"]) for c in json.loads(raw)])
-    except Exception:
-        # Fallback: extract all JSON-looking arrays from the text
-        matches = re.findall(r"\[.*?\]", raw, re.DOTALL)
-        for m in matches:
-            try:
-                data = json.loads(m)
-                all_cards.extend([(c["front"], c["back"]) for c in data])
-            except Exception:
-                continue  # skip invalid blocks
-
-    return all_cards
-
-@app.post("/upload_pdf")
-async def upload_pdf(file: UploadFile, subject: str = Form(...), test: str = Form(...)):
-    try:
-        # Extract text
-        text = ""
-        with pdfplumber.open(file.file) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-
-        if not text.strip():
-            raise HTTPException(status_code=400, detail="No text found in PDF")
-
-        # Generate flashcards
-        cards = parse_flashcards(text)
-        if not cards:
-            raise HTTPException(status_code=500, detail="Failed to generate flashcards")
-
-        # Store in SQLite
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute("INSERT OR IGNORE INTO subjects(name) VALUES (?)", (subject,))
-        subject_id = cur.execute("SELECT id FROM subjects WHERE name=?", (subject,)).fetchone()[0]
-
-        cur.execute("INSERT OR IGNORE INTO tests(name, subject_id) VALUES (?,?)", (subject_id, test))
-        test_id = cur.execute("SELECT id FROM tests WHERE name=? AND subject_id=?", (test, subject_id)).fetchone()[0]
-
-        # Get existing flashcards for this test to check for duplicates
-        cur.execute("SELECT front FROM flashcards WHERE test_id=?", (test_id,))
-        existing_fronts = set(row[0] for row in cur.fetchall())
-
-        # Only insert new flashcards (check by front text)
-        new_cards = [(front, back) for front, back in cards if front not in existing_fronts]
+        uploaded_count = 0
+        skipped_count = 0
         
-        for front, back in new_cards:
-            cur.execute("INSERT INTO flashcards(test_id, front, back) VALUES (?,?,?)",
-                        (test_id, front, back))
-
-        conn.commit()
-        conn.close()
-
-        skipped = len(cards) - len(new_cards)
-        return {"message": f"Added {len(new_cards)} new flashcards (skipped {skipped} duplicates)"}
+        for card_data in batch.flashcards:
+            # Create subject and test
+            subject_id = insert_subject(card_data.subject, current_user["id"])
+            test_id = insert_test(card_data.test, subject_id)
+            
+            # Check if flashcard already exists
+            existing_fronts = get_existing_flashcard_fronts(test_id)
+            
+            if card_data.front not in existing_fronts:
+                insert_flashcards(test_id, [(card_data.front, card_data.back)])
+                uploaded_count += 1
+            else:
+                skipped_count += 1
+        
+        return {
+            "message": f"Uploaded {uploaded_count} new flashcards, skipped {skipped_count} duplicates",
+            "uploaded": uploaded_count,
+            "skipped": skipped_count
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
     
     from fastapi import Path
 
 @app.get("/subjects")
-def get_subjects():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM subjects")
-    rows = cur.fetchall()
-    conn.close()
-    return [{"id": row[0], "name": row[1]} for row in rows]
+def get_subjects(current_user: dict = Depends(get_current_user)):
+    rows = execute_query("SELECT * FROM subjects WHERE user_id = %s", (current_user["id"],))
+    return [{"id": row['id'], "name": row['name']} for row in rows]
 
 @app.get("/subjects/{subject_id}/tests")
-def get_tests(subject_id: int = Path(...)):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM tests WHERE subject_id = ?", (subject_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return [{"id": row[0], "subject_id": row[1], "name": row[2]} for row in rows]
+def get_tests(subject_id: int = Path(...), current_user: dict = Depends(get_current_user)):
+    # Verify the subject belongs to the user
+    subject = execute_query("SELECT id FROM subjects WHERE id = %s AND user_id = %s", (subject_id, current_user["id"]), fetch_one=True)
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+    
+    rows = execute_query("SELECT * FROM tests WHERE subject_id = %s", (subject_id,))
+    return [{"id": row['id'], "subject_id": row['subject_id'], "name": row['name']} for row in rows]
 
 @app.get("/tests/{test_id}/flashcards")
-def get_flashcards(test_id: int = Path(...)):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM flashcards WHERE test_id = ?", (test_id,))
-    rows = cur.fetchall()
-    conn.close()
-    return [{"id": row[0], "test_id": row[1], "front": row[2], "back": row[3], "mastered": bool(row[4])} for row in rows]
+def get_flashcards(test_id: int = Path(...), current_user: dict = Depends(get_current_user)):
+    # Verify the test belongs to the user through the subject
+    test = execute_query("""
+        SELECT t.id FROM tests t 
+        JOIN subjects s ON t.subject_id = s.id 
+        WHERE t.id = %s AND s.user_id = %s
+    """, (test_id, current_user["id"]), fetch_one=True)
+    
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+    
+    rows = execute_query("SELECT * FROM flashcards WHERE test_id = %s", (test_id,))
+    return [{"id": row['id'], "test_id": row['test_id'], "front": row['front'], "back": row['back'], "mastered": bool(row['mastered'])} for row in rows]
 
 @app.patch("/flashcards/{flashcard_id}/mastered")
-def update_mastered(flashcard_id: int, mastered: bool = Body(...)):
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("UPDATE flashcards SET mastered=? WHERE id=?", (mastered, flashcard_id))
-    conn.commit()
-    conn.close()
+def update_mastered(flashcard_id: int, mastered: bool = Body(...), current_user: dict = Depends(get_current_user)):
+    # Verify the flashcard belongs to the user
+    flashcard = execute_query("""
+        SELECT f.id FROM flashcards f
+        JOIN tests t ON f.test_id = t.id
+        JOIN subjects s ON t.subject_id = s.id
+        WHERE f.id = %s AND s.user_id = %s
+    """, (flashcard_id, current_user["id"]), fetch_one=True)
+    
+    if not flashcard:
+        raise HTTPException(status_code=404, detail="Flashcard not found")
+    
+    execute_query("UPDATE flashcards SET mastered=%s WHERE id=%s", (mastered, flashcard_id), fetch_all=False)
     return {"id": flashcard_id, "mastered": mastered}
 
 # Removed reset_db endpoint for production safety

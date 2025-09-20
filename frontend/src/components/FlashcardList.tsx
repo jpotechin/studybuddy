@@ -1,4 +1,5 @@
 import { type FC } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -42,16 +43,26 @@ const FlashcardList: FC<FlashcardListProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Section */}
-      <div className="flex items-center justify-between p-4 bg-card border rounded-lg shadow-sm">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-card border rounded-lg shadow-sm">
         <div>
           <h2 className="text-2xl font-bold">Flashcards List</h2>
           <p className="text-muted-foreground mt-1">
             {subjectName} - {testName}
           </p>
         </div>
-        <Button variant="outline" onClick={onBack}>
-          🔙 Back to Tests
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Link 
+            to={`/create?subject=${encodeURIComponent(subjectName)}&test=${encodeURIComponent(testName)}`}
+            className="w-full sm:w-auto"
+          >
+            <Button variant="default" className="w-full sm:w-auto">
+              ➕ Create Cards for This Test
+            </Button>
+          </Link>
+          <Button variant="outline" onClick={onBack} className="w-full sm:w-auto">
+            🔙 Back to Tests
+          </Button>
+        </div>
       </div>
 
       {/* Content Section */}
@@ -61,49 +72,42 @@ const FlashcardList: FC<FlashcardListProps> = ({
             <p className="text-muted-foreground">No flashcards available.</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader className="bg-muted/50">
-              <TableRow>
-                <TableHead className="w-[70%] font-semibold">Question</TableHead>
-                <TableHead className="w-[20%] text-center font-semibold">Status</TableHead>
-                <TableHead className="w-[10%] text-center font-semibold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {flashcards.map((card, index) => (
-                <TableRow
-                  key={card.id}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors border-b last:border-b-0"
-                  onClick={() => onStudy(index)}
-                >
-                  <TableCell className="font-medium py-4">
+          <div className="space-y-2">
+            {flashcards.map((card, index) => (
+              <div
+                key={card.id}
+                className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+                onClick={() => onStudy(index)}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm sm:text-base break-words">
                     {card.front}
-                  </TableCell>
-                  <TableCell className="text-center py-4">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      card.mastered 
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                    }`}>
-                      {card.mastered ? "✅ Mastered" : "❌ Not Mastered"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center py-4">
-                    {card.mastered && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleUnmaster(e, card.id)}
-                        className="text-xs"
-                      >
-                        Unmaster
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    card.mastered 
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                      : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                  }`}>
+                    {card.mastered ? "✅ Mastered" : "❌ Not Mastered"}
+                  </span>
+                  
+                  {card.mastered && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => handleUnmaster(e, card.id)}
+                      className="text-xs w-full sm:w-auto"
+                    >
+                      Unmaster
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
