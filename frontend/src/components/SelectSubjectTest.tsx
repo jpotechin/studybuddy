@@ -1,13 +1,6 @@
 import { useState, useEffect } from "react";
-import { useSubjects, useTests, useFlashcards } from "../api/hooks";
+import { useSubjects, useTests } from "../api/hooks";
 import { Button } from "@/components/ui/button";
-
-interface Flashcard {
-  id: number;
-  front: string;
-  back: string;
-  mastered: boolean;
-}
 
 interface Subject {
   id: number;
@@ -36,11 +29,8 @@ export default function SelectSubjectTest({ onSelectTest }: Props) {
     selectedSubjectId || 0
   );
 
-  // Fetch flashcards for a test
+  // Track selected test
   const [selectedTestId, setSelectedTestId] = useState<number | null>(null);
-  const { data: flashcards, isLoading: loadingFlashcards } = useFlashcards(
-    selectedTestId || 0
-  );
 
   // Handle test click
   const handleTestClick = (testId: number) => {
@@ -57,7 +47,6 @@ export default function SelectSubjectTest({ onSelectTest }: Props) {
   // Loading states
   if (loadingSubjects) return <p>Loading subjects...</p>;
   if (selectedSubjectId && loadingTests) return <p>Loading tests...</p>;
-  if (selectedTestId && loadingFlashcards) return <p>Loading flashcards...</p>;
 
   // Render subjects or tests
   if (!selectedSubjectId) {
